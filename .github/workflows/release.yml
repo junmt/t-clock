@@ -1,0 +1,66 @@
+name: Release
+
+# v で始まるタグ (例: v0.1.0, v1.2.3) を push すると起動する
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # Release の作成・アセット添付に必要
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # タグ v1.2.3 -> バージョン 1.2.3 を取り出す
+      - name: Resolve version from tag
+        id: ver
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore TClock.sln
+
+      - name: Test
+        run: dotnet test TClock.Tests/TClock.Tests.csproj -c Release --no-restore
+
+      # .NET ランタイム同梱の自己完結型・単一 exe を生成する
+      - name: Publish (self-contained single-file, win-x64)
+        run: >
+          dotnet publish TClock.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:Version=${{ steps.ver.outputs.version }}
+          -o publish
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $zip = "t-clock-${{ steps.ver.outputs.version }}-win-x64.zip"
+          Compress-Archive -Path publish/t-clock.exe -DestinationPath $zip
+          "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        id: pack
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # タグ push で起動しているため tag_name は自動 (GITHUB_REF)
+          name: t-clock ${{ github.ref_name }}
+          generate_release_notes: true   # コミットから変更履歴を自動生成
+          files: |
+            publish/t-clock.exe
+            ${{ steps.pack.outputs.zip }}
