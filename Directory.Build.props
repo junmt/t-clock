@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Google ドライブ(G:\マイドライブ)上でビルドすると、CreateAppHost が
+    生成した実行ファイル(t-clock.exe)をメモリマップしてアイコン等の
+    リソースを書き込む際に ERROR_USER_MAPPED_FILE
+    (「ユーザー マップ セクションで開いたファイルでは実行できません」)で失敗する。
+    これは Google ドライブの仮想ファイルシステムの制約による既知の問題。
+
+    そのため obj/bin の出力先だけをローカルディスクへ逃がす。
+    ソースはドライブ上に残るので同期は維持される。
+    末尾の \ は必須。プロジェクトごとにサブフォルダを分けて衝突を防ぐ。
+  -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(LOCALAPPDATA)\tclock-build\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(LOCALAPPDATA)\tclock-build\$(MSBuildProjectName)\bin\</BaseOutputPath>
+  </PropertyGroup>
+
+</Project>

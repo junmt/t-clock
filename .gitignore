@@ -1,0 +1,23 @@
+# .NET build output
+bin/
+obj/
+
+# publish
+publish/
+
+# Rider / VS
+.vs/
+*.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Claude Code internal state
+.claude/
+
+# distribution build output
+dist/

@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>TClock</RootNamespace>
+    <AssemblyName>t-clock</AssemblyName>
+    <Version>0.1.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- WinForms の型はコード内で WForms.* として明示参照するため、
+       暗黙 using から System.Windows.Forms を外して WPF の型との衝突を防ぐ
+       (Application / MouseEventArgs / Button など)。 -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <!-- テストプロジェクトはこのディレクトリ配下にあるため、
+       既定のグロブが拾わないよう明示的に除外する。 -->
+  <ItemGroup>
+    <Compile Remove="TClock.Tests\**" />
+    <EmbeddedResource Remove="TClock.Tests\**" />
+    <None Remove="TClock.Tests\**" />
+    <Page Remove="TClock.Tests\**" />
+    <ApplicationDefinition Remove="TClock.Tests\**" />
+  </ItemGroup>
+
+  <!-- ビルド出力(obj/bin)は Directory.Build.props でローカルディスクへ逃がしているが、
+       完成した exe 一式はプロジェクト直下の dist\ へコピーしておく。
+       完成ファイルの単純コピーなので、CreateAppHost のようなメモリマップは発生せず
+       Google ドライブ上でも書き込める。dist\ 自体はビルド対象から除外する。 -->
+  <PropertyGroup>
+    <DistDir>$(MSBuildProjectDirectory)\dist\</DistDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="dist\**" />
+    <EmbeddedResource Remove="dist\**" />
+    <None Remove="dist\**" />
+    <Page Remove="dist\**" />
+  </ItemGroup>
+
+  <Target Name="CopyOutputToProjectDir" AfterTargets="Build">
+    <ItemGroup>
+      <_DistFiles Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_DistFiles)"
+          DestinationFiles="@(_DistFiles-&gt;'$(DistDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          OverwriteReadOnlyFiles="true" />
+    <Message Importance="high" Text="出力を dist へコピーしました: $(DistDir)" />
+  </Target>
+
+</Project>
