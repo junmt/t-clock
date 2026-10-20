@@ -313,7 +313,7 @@ public partial class MainWindow : Window
 
     private void ToggleAutostart_Click(object sender, RoutedEventArgs e)
     {
-        _settings.Autostart = !_settings.Autostart;
+        _settings.Autostart = !IsAutostartRegistered();
         SetAutostart(_settings.Autostart);
         Mark(AutostartBtn, _settings.Autostart);
         _settings.Save();
@@ -433,6 +433,11 @@ public partial class MainWindow : Window
         var menu = new WForms.ContextMenuStrip();
         menu.Items.Add("表示", null, (_, _) => ShowFromTray());
         menu.Items.Add("クリックスルー切替", null, (_, _) => ToggleThrough_Click(this, new RoutedEventArgs()));
+        var autostartItem = new WForms.ToolStripMenuItem("Windows 起動時に自動起動");
+        autostartItem.Click += (_, _) => ToggleAutostart_Click(this, new RoutedEventArgs());
+        menu.Items.Add(autostartItem);
+        // ⚡ ボタンやインストーラーで変更された場合も反映するため、開くたびに実際の登録状態を読む
+        menu.Opening += (_, _) => autostartItem.Checked = IsAutostartRegistered();
         menu.Items.Add(new WForms.ToolStripSeparator());
         menu.Items.Add($"更新を確認 (v{Updater.CurrentVersion.ToString(3)})", null, async (_, _) => await CheckForUpdateAsync(manual: true));
         menu.Items.Add(new WForms.ToolStripSeparator());
