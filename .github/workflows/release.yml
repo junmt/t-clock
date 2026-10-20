@@ -1,21 +1,27 @@
 name: Release
 
-# v で始まるタグ (例: v0.1.0, v1.2.3) を push すると起動する
+# GitHub 上で Release を公開 (Publish release) すると起動し、
+# 単一 exe・zip・インストーラーをビルドしてその Release に添付する。
+# タグ名は v で始める (例: v0.1.0, v1.2.3)。
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 permissions:
-  contents: write   # Release の作成・アセット添付に必要
+  contents: write   # Release へのアセット添付に必要
 
 jobs:
   build-and-release:
     runs-on: windows-latest
 
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
@@ -26,7 +32,7 @@ jobs:
       - name: Resolve version from tag
         id: ver
         shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore TClock.sln
@@ -48,19 +54,37 @@ jobs:
           -o publish
 
       - name: Package zip
+        id: pack
         shell: pwsh
         run: |
           $zip = "t-clock-${{ steps.ver.outputs.version }}-win-x64.zip"
           Compress-Archive -Path publish/t-clock.exe -DestinationPath $zip
           "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-        id: pack
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          # タグ push で起動しているため tag_name は自動 (GITHUB_REF)
-          name: t-clock ${{ github.ref_name }}
-          generate_release_notes: true   # コミットから変更履歴を自動生成
-          files: |
-            publish/t-clock.exe
-            ${{ steps.pack.outputs.zip }}
+      # Inno Setup でインストーラーを作成する (ランナーに無ければ choco で導入)
+      - name: Build installer (Inno Setup)
+        id: setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DMyAppVersion=${{ steps.ver.outputs.version }}" `
+                  "/DSourceExe=$PWD\publish\t-clock.exe" `
+                  installer\t-clock.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = "installer/Output/t-clock-${{ steps.ver.outputs.version }}-setup.exe"
+          "installer=$exe" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: >
+          gh release upload $env:TAG
+          publish/t-clock.exe
+          ${{ steps.pack.outputs.zip }}
+          ${{ steps.setup.outputs.installer }}
+          --clobber
+          --repo ${{ github.repository }}

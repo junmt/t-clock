@@ -48,6 +48,20 @@ bin\Release\net8.0-windows\win-x64\publish\t-clock.exe
 この `t-clock.exe` 1ファイルを任意の場所に置いてダブルクリックで起動できます
 （配布先PCに .NET のインストールは不要）。
 
+### GitHub Release による自動ビルド
+
+GitHub の **Releases → Draft a new release** で `v1.2.3` 形式のタグを付けて
+**Publish release** すると、GitHub Actions（[`.github/workflows/release.yml`](.github/workflows/release.yml)）が
+テスト・ビルドを行い、次のファイルをその Release に自動添付します。
+
+| ファイル | 内容 |
+| --- | --- |
+| `t-clock-<version>-setup.exe` | インストーラー（Inno Setup / 既定はユーザー単位インストールで管理者権限不要） |
+| `t-clock.exe` | 単一 exe（ランタイム同梱・インストール不要） |
+| `t-clock-<version>-win-x64.zip` | 上記 exe の zip |
+
+インストーラーの定義は [`installer/t-clock.iss`](installer/t-clock.iss)。
+
 ### ランタイム依存の軽量ビルド（配布先に .NET 8 がある場合）
 
 ```powershell

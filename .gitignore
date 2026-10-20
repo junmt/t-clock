@@ -21,3 +21,6 @@ Thumbs.db
 
 # distribution build output
 dist/
+
+# Inno Setup output
+installer/Output/
