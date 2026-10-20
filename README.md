@@ -61,6 +61,15 @@ GitHub の **Releases → Draft a new release** で `v1.2.3` 形式のタグを�
 | `t-clock-<version>-win-x64.zip` | 上記 exe の zip |
 
 インストーラーの定義は [`installer/t-clock.iss`](installer/t-clock.iss)。
+インストール時に「Windows の起動時に t-clock を自動起動する」を選べます（既定 ON、後からツールバーの ⚡ で切替可）。
+
+### アップデート
+
+起動時に GitHub の最新 Release を確認し、新しいバージョンがあればトレイ通知が出ます
+（通知クリック、またはトレイ右クリック →「更新を確認」で更新）。
+
+- インストーラーで入れた場合: 最新の `*-setup.exe` をダウンロードして無人インストールし、完了後に再起動
+- 単体 exe の場合: 最新の `t-clock.exe` をダウンロードしてその場で差し替え、再起動
 
 ### ランタイム依存の軽量ビルド（配布先に .NET 8 がある場合）
 
@@ -91,6 +100,8 @@ t-clock/
 ├─ MainWindow.xaml(.cs)   # UI + 時計/タイマー/トレイ/通知/ウィンドウ制御
 ├─ TimerItem.cs           # タイマー1件のモデル（絶対時刻ベース）
 ├─ Settings.cs            # 設定の JSON 永続化
+├─ Updater.cs             # GitHub Release からのアップデート
+├─ installer/t-clock.iss  # インストーラー定義 (Inno Setup)
 ├─ app.manifest           # 高DPI対応
 ├─ app.ico                # アプリ/トレイアイコン
 └─ docs/specification.md  # 仕様書

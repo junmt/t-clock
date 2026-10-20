@@ -52,6 +52,8 @@ public partial class MainWindow : Window
         SetupTray();
         UpdateClock();
         PlaceWindow();
+        Updater.CleanupOldFiles();
+        _ = CheckForUpdateAsync(manual: false);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -77,6 +79,8 @@ public partial class MainWindow : Window
 
     private void ApplySettingsToUi()
     {
+        // インストーラーで自動起動を登録した場合もあるため、実際の Run キーの状態を正とする
+        _settings.Autostart = IsAutostartRegistered();
         Opacity = Math.Max(20, _settings.Opacity) / 100.0;
         OpacitySlider.Value = _settings.Opacity;
         Topmost = _settings.AlwaysOnTop;
@@ -430,6 +434,8 @@ public partial class MainWindow : Window
         menu.Items.Add("表示", null, (_, _) => ShowFromTray());
         menu.Items.Add("クリックスルー切替", null, (_, _) => ToggleThrough_Click(this, new RoutedEventArgs()));
         menu.Items.Add(new WForms.ToolStripSeparator());
+        menu.Items.Add($"更新を確認 (v{Updater.CurrentVersion.ToString(3)})", null, async (_, _) => await CheckForUpdateAsync(manual: true));
+        menu.Items.Add(new WForms.ToolStripSeparator());
         menu.Items.Add("終了", null, (_, _) => ExitApp());
 
         _tray = new WForms.NotifyIcon
@@ -440,6 +446,69 @@ public partial class MainWindow : Window
             Icon = LoadTrayIcon(),
         };
         _tray.DoubleClick += (_, _) => ShowFromTray();
+        _tray.BalloonTipClicked += async (_, _) =>
+        {
+            if (_pendingUpdate is { } u) await PromptUpdateAsync(u);
+        };
+    }
+
+    // ================= アップデート =================
+    private UpdateInfo? _pendingUpdate;
+    private bool _updating;
+
+    private async Task CheckForUpdateAsync(bool manual)
+    {
+        if (_updating) return;
+        var info = await Updater.CheckAsync();
+        if (info == null)
+        {
+            if (manual)
+                MessageBox.Show($"お使いのバージョン (v{Updater.CurrentVersion.ToString(3)}) は最新です。\n" +
+                                "（確認できなかった場合はネットワーク接続をご確認ください）",
+                                "t-clock", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _pendingUpdate = info;
+        if (manual)
+            await PromptUpdateAsync(info);
+        else
+            _tray?.ShowBalloonTip(8000, "t-clock の更新",
+                $"新しいバージョン {info.Tag} があります。クリックして更新します。", WForms.ToolTipIcon.Info);
+    }
+
+    private async Task PromptUpdateAsync(UpdateInfo info)
+    {
+        if (_updating) return;
+        if (!Updater.CanApply(info))
+        {
+            // 自動適用できない (アセット未添付等) 場合はリリースページを開く
+            if (MessageBox.Show($"新しいバージョン {info.Tag} があります。リリースページを開きますか？",
+                    "t-clock の更新", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                Updater.OpenPage(info.PageUrl);
+            return;
+        }
+
+        if (MessageBox.Show($"新しいバージョン {info.Tag} があります（現在 v{Updater.CurrentVersion.ToString(3)}）。\n" +
+                            "今すぐ更新しますか？ 更新後に t-clock は自動で再起動します。",
+                "t-clock の更新", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        _updating = true;
+        try
+        {
+            _tray?.ShowBalloonTip(3000, "t-clock の更新", $"{info.Tag} をダウンロードしています…", WForms.ToolTipIcon.Info);
+            var launch = await Updater.PrepareAsync(info);
+            ExitApp();      // 設定を保存してから
+            launch();       // インストーラー / 新しい exe を起動
+        }
+        catch (Exception ex)
+        {
+            _updating = false;
+            if (MessageBox.Show($"更新に失敗しました。\n{ex.Message}\n\nリリースページを開きますか？",
+                    "t-clock の更新", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                Updater.OpenPage(info.PageUrl);
+        }
     }
 
     private static Drawing.Icon LoadTrayIcon()
@@ -484,6 +553,16 @@ public partial class MainWindow : Window
 
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string AppRegName = "t-clock";
+
+    private static bool IsAutostartRegistered()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey);
+            return key?.GetValue(AppRegName) != null;
+        }
+        catch { return false; }
+    }
 
     private static void SetAutostart(bool on)
     {

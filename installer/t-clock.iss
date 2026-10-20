@@ -44,6 +44,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "autostart"; Description: "{cm:AutostartTask}"; GroupDescription: "{cm:AutostartGroup}"
+
+[CustomMessages]
+japanese.AutostartGroup=起動オプション:
+japanese.AutostartTask=Windows の起動時に t-clock を自動起動する
+english.AutostartGroup=Startup options:
+english.AutostartTask=Start t-clock automatically when Windows starts
 
 [Files]
 Source: "{#SourceExe}"; DestDir: "{app}"; Flags: ignoreversion
@@ -53,8 +60,23 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
+; 「自動起動」タスク選択時はアプリの ⚡ ボタンと同じ Run キーへ登録する
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "t-clock"; ValueData: """{app}\{#MyAppExeName}"""; Tasks: autostart; Flags: uninsdeletevalue
 ; アプリの「自動起動」で登録される Run キーをアンインストール時に削除する (作成はしない)
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "t-clock"; Flags: dontcreatekey uninsdeletevalue
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; アプリ内アップデート (/SILENT /UPDATE で起動される) の完了後は自動で再起動する
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsUpdateMode
+
+[Code]
+function IsUpdateMode: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/UPDATE') = 0 then
+      Result := True;
+end;
